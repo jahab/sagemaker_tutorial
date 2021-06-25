@@ -26,7 +26,7 @@ from tools import generate_detections as gdet
 import pandas as pd
 from io import StringIO
 import boto3
-
+import csv
 
 iou=0.45
 score=0.50
@@ -70,7 +70,7 @@ def detect_object(video_path,bucket = "itzikbucket18",input_size=416):
         else:
             print('Video has ended or failed, try a different video format!')
             break
-        frame_num +=1
+        
         # print('Frame #: ', frame_num)
         frame_size = frame.shape[:2]
         image_data = cv2.resize(frame, (input_size, input_size))
@@ -150,22 +150,46 @@ def detect_object(video_path,bucket = "itzikbucket18",input_size=416):
         # Call the tracker
         tracker.predict()
         tracker.update(detections)
-        
+        track_df=pd.DataFrame([],columns=['Bounding boxes'])
+        print(track_df)
         # update tracks
         for track in tracker.tracks:
             
             if not track.is_confirmed() or track.time_since_update > 1:
+                # track_csv=pd.DataFrame([],columns=['Tracker ID','Class','xmin','ymin','xmax','ymax'])
+                # output.write('\n ' + str(int(track.to_tlwh()[0])) + ' ' + str(int(track.to_tlwh()[1])) + ' ' + str(int(track.to_tlwh()[2])) + ' ' + str(int(track.to_tlwh()[3])))
+                # print(track_csv)
+                #track_csv.to_csv('df_{:08d}.csv'.format(frame_num),index=False)
                 continue 
             bbox = track.to_tlbr()
             #print(bbox)
             class_name = track.get_class()
             
             try:
-                track_csv=pd.DataFrame([{'Tracker ID':str(track.track_id),'Class':class_name, 'xmin':int(bbox[0]),'ymin':int(bbox[1]),'xmax':int(bbox[2]),'ymax':int(bbox[3])}])
-                print(track_csv)
+                # track_csv=pd.DataFrame([{'Tracker ID':str(track.track_id),'Class':class_name, 'xmin':int(bbox[0]),'ymin':int(bbox[1]),'xmax':int(bbox[2]),'ymax':int(bbox[3])}])
+                # track_csv=pd.DataFrame([int(bbox[0]),int(bbox[1]),int(bbox[2]),int(bbox[3])])
+                
+                track_csv=pd.DataFrame(['{} {} {} {}'.format(int(track.to_tlwh()[0]),int(track.to_tlwh()[1]),int(track.to_tlwh()[2]),int(track.to_tlwh()[3]))],columns=['Bounding boxes'])
+                #print(track_csv)
+                track_df=pd.concat([track_df,track_csv])
+                # output.write('\n ' + str(int(track.to_tlwh()[0])) + ' ' + str(int(track.to_tlwh()[1])) + ' ' + str(int(track.to_tlwh()[2])) + ' ' + str(int(track.to_tlwh()[3])))
+                # track_csv.to_csv('df_{:08d}.csv'.format(frame_num),index=False)
+                # print(track_csv)
                 # csv_buffer = StringIO()
                 # track_csv.to_csv(csv_buffer)
                 # s3_resource = boto3.resource('s3')
                 # s3_resource.Object(bucket, 'samp_dets/df_{:08d}.csv'.format(frame_num)).put(Body=csv_buffer.getvalue())
             except Exception as e:
+                traceback.print_exc()
                 print(e)
+        try:
+            print(track_df)
+            track_df.to_csv('df_{:08d}.csv'.format(frame_num),index=False,sep=',',quoting=csv.QUOTE_NONE,quotechar='',escapechar=',')
+        except Exception as e:
+            print(e)
+        frame_num +=1
+
+
+video_path='/home/admin-pc/Downloads/test_football.mp4' 
+
+detect_object(video_path,bucket = "itzikbucket18",input_size=416)

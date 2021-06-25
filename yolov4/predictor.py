@@ -36,7 +36,20 @@ app = flask.Flask(__name__)
 @app.route('/ping', methods=['GET'])
 def ping():
     # Check if the classifier was loaded correctly
-    print('hooooooooooooooooooo')
+    # print('hooooooooooooooooooo')
+    # bucket = "itzikbucket18"
+    # video_path='test_football.mp4'
+    # try:
+    #     s3_resource = boto3.resource('s3')
+    #     s3_resource.Bucket(bucket).download_file(video_path, video_path)
+    #     print('directory contents:',os.listdir())
+    #     print(video_path)
+
+    #     # success=detect_object(video_path,bucket = "itzikbucket18",input_size=416)
+
+    # except Exception as e:
+    #     traceback.print_exc()
+
     return flask.Response(response= json.dumps({"result":"pong"}), status=200, mimetype='application/json' )
 
 
@@ -45,6 +58,7 @@ def transformation():
     # Get input JSON data and convert it to a DF
     input_json = flask.request.get_json()
     video_path = input_json['input']['video']
+    print('insude detection API:',video_path)
     # predictions = float(regressor.predict([[input]]))
     success=detect_object(video_path,bucket = "itzikbucket18",input_size=416)
 

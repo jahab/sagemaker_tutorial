@@ -27,7 +27,7 @@ import pandas as pd
 from io import StringIO
 import boto3
 import traceback
-
+import csv
 
 iou=0.45
 score=0.50
@@ -60,8 +60,11 @@ def detect_object(video_path,bucket = "itzikbucket18",input_size=416):
     if not os.path.isfile(video_path):
         print('check if  video file correctly downloaded from S3')
         raise FileNotFoundError
+    print(os.listdir())
     vid = cv2.VideoCapture(video_path)
-
+    
+    save_folder=os.path.basename(video_path).split('.')[0]
+    
     width = int(vid.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(vid.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = int(vid.get(cv2.CAP_PROP_FPS))
@@ -71,6 +74,8 @@ def detect_object(video_path,bucket = "itzikbucket18",input_size=416):
     # while video is running
     while True:
         return_value, frame = vid.read()
+        filename = os.path.join(save_folder,'f' + str(frame_num) + '.txt')
+
         if return_value:
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             frame = cv2.resize(frame,(1280,720),fx=0,fy=0, interpolation = cv2.INTER_CUBIC)
@@ -78,7 +83,7 @@ def detect_object(video_path,bucket = "itzikbucket18",input_size=416):
         else:
             print('Video has ended or failed, try a different video format!')
             break
-        frame_num +=1
+        
         # print('Frame #: ', frame_num)
         frame_size = frame.shape[:2]
         image_data = cv2.resize(frame, (input_size, input_size))
@@ -158,26 +163,30 @@ def detect_object(video_path,bucket = "itzikbucket18",input_size=416):
         # Call the tracker
         tracker.predict()
         tracker.update(detections)
-        
+        track_df=pd.DataFrame([],columns=['Bounding boxes'])
         # update tracks
         for track in tracker.tracks:
             
             if not track.is_confirmed() or track.time_since_update > 1:
                 continue 
             bbox = track.to_tlbr()
-            #print(bbox)
             class_name = track.get_class()
             
             try:
-                track_csv=pd.DataFrame([{'Tracker ID':str(track.track_id),'Class':class_name, 'xmin':int(bbox[0]),'ymin':int(bbox[1]),'xmax':int(bbox[2]),'ymax':int(bbox[3])}])
-                print(track_csv)
-                csv_buffer = StringIO()
-                track_csv.to_csv(csv_buffer)
-                s3_resource = boto3.resource('s3')
-                s3_resource.Object(bucket, 'samp_dets/df_{:08d}.csv'.format(frame_num)).put(Body=csv_buffer.getvalue())
+                # track_csv=pd.DataFrame([{'Tracker ID':str(track.track_id),'Class':class_name, 'xmin':int(bbox[0]),'ymin':int(bbox[1]),'xmax':int(bbox[2]),'ymax':int(bbox[3])}])
+
+                track_csv=pd.DataFrame(['{} {} {} {}'.format(int(track.to_tlwh()[0]),int(track.to_tlwh()[1]),int(track.to_tlwh()[2]),int(track.to_tlwh()[3]))],columns=['Bounding boxes'])
+                track_df=pd.concat([track_df,track_csv])
+
                 success=True
             except Exception as e:
                 success=False
                 print(e)
-
+        print(track_df)
+        csv_buffer = StringIO()
+        track_df.to_csv(csv_buffer,index=False,sep=',',quoting=csv.QUOTE_NONE,quotechar='',escapechar=',')
+        s3_resource = boto3.resource('s3')
+        s3_resource.Object(bucket, '{}/f{}.txt'.format(save_folder,frame_num)).put(Body=csv_buffer.getvalue())
+        frame_num +=1
+    os.remove(video_path)
     return success

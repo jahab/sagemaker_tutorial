@@ -1,7 +1,9 @@
 import requests
 import json
 # Define test JSON
-vid_name='Final_1280_720.mp4' ####uploaded video name in S3 bucket
+
+vid_name='test_football.mp4' ####uploaded video name in S3 bucket
+
 input_video = {'input':{'video':vid_name}}
 
 input_json = json.dumps(input_video)
